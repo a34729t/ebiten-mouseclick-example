@@ -9,13 +9,19 @@ import (
 )
 
 var USE_INPUT_MANAGER = true // Change to demonstrate mouse click weirdness
-const BUTTON0 = ebiten.MouseButton0
 
 type Game struct {
-	state        *MouseState
 	inputManager *InputManager
 }
 
+// InputManager listens for mouse input in a goroutine, and pushes a notification on a channel
+// when a mouse click is detected
+type InputManager struct {
+	inputChannel chan bool
+	state        *MouseState
+}
+
+// MouseState tracks the first press of the mouse button so we can calculate duration.
 type MouseState struct {
 	FirstPressedTs int64
 }
@@ -25,7 +31,6 @@ type MouseState struct {
 // Else, listen for input in main thread.
 func main() {
 	game := &Game{
-		state:        &MouseState{},
 		inputManager: NewInputManager(),
 	}
 
@@ -45,7 +50,7 @@ func (g *Game) Update() error {
 	if USE_INPUT_MANAGER {
 		g.inputManager.HandleInput()
 	} else {
-		detectMouseClick(g.state)
+		detectMouseClick(g.inputManager.state)
 	}
 	return nil
 }
@@ -55,24 +60,17 @@ func (g *Game) Layout(int, int) (screenWidth, screenHeight int) { return 1024, 7
 // detectMouseClick checks for mouse press/release events and tracks the first press time
 // and logs duration of press on release
 func detectMouseClick(s *MouseState) bool {
-	if inpututil.IsMouseButtonJustPressed(BUTTON0) {
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButton0) {
 		s.FirstPressedTs = time.Now().UnixNano()
 		log.Print("Mouse just pressed")
 	}
-	if inpututil.IsMouseButtonJustReleased(BUTTON0) {
+	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButton0) {
 		durationMillis := (time.Now().UnixNano() - s.FirstPressedTs) / 1000000
 		x, y := ebiten.CursorPosition()
 		log.Printf("Mouse released at <%d, %d> with %d", x, y, durationMillis)
 		return true
 	}
 	return false
-}
-
-// InputManager listens for mouse input in a goroutine, and pushes a notification on a channel
-// when a mouse click is detected
-type InputManager struct {
-	inputChannel chan bool
-	state        *MouseState
 }
 
 func NewInputManager() *InputManager {
